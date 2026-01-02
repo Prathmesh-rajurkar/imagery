@@ -20,19 +20,13 @@ export async function POST(req: Request) {
     }
 
     if (!file) {
-      return NextResponse.json(
-        { message: "File missing" },
-        { status: 400 }
-      );
+      return NextResponse.json({ message: "File missing" }, { status: 400 });
     }
 
     /* ===============================
        2️⃣ Hash API Key
     =============================== */
-    const keyHash = crypto
-      .createHash("sha256")
-      .update(rawApiKey)
-      .digest("hex");
+    const keyHash = crypto.createHash("sha256").update(rawApiKey).digest("hex");
 
     /* ===============================
        3️⃣ Validate API Key
@@ -44,10 +38,7 @@ export async function POST(req: Request) {
       .single();
 
     if (apiKeyError || !apiKey || !apiKey.is_active) {
-      return NextResponse.json(
-        { message: "Invalid API key" },
-        { status: 401 }
-      );
+      return NextResponse.json({ message: "Invalid API key" }, { status: 401 });
     }
 
     /* ===============================
@@ -60,19 +51,19 @@ export async function POST(req: Request) {
       .single();
 
     if (userError || !user) {
-      return NextResponse.json(
-        { message: "User not found" },
-        { status: 404 }
-      );
+      return NextResponse.json({ message: "User not found" }, { status: 404 });
     }
 
     /* ===============================
        5️⃣ Build Storage Path
     =============================== */
-    const fileExt = file.name.split(".").pop();
-    const fileName = `${crypto.randomUUID()}.${fileExt}`;
-    const storagePath = `${user.username}/${fileName}`;
+    const ext = file.name.split(".").pop();
 
+    // 8 chars = ~4 billion combinations (safe)
+    const shortId = crypto.randomUUID().slice(0, 8);
+
+    const fileName = `${shortId}.${ext}`;
+    const storagePath = `${user.username}/${fileName}`;
     /* ===============================
        6️⃣ Upload to Supabase Storage
     =============================== */
@@ -87,10 +78,7 @@ export async function POST(req: Request) {
 
     if (uploadError) {
       console.error(uploadError);
-      return NextResponse.json(
-        { message: "Upload failed" },
-        { status: 500 }
-      );
+      return NextResponse.json({ message: "Upload failed" }, { status: 500 });
     }
 
     /* ===============================
@@ -99,7 +87,7 @@ export async function POST(req: Request) {
     return NextResponse.json({
       success: true,
       path: storagePath,
-      url: `/image/${storagePath}`,
+      url: `/images/${storagePath}`,
     });
   } catch (error) {
     console.error("Upload error:", error);

@@ -17,7 +17,7 @@ export async function POST(req: Request) {
 
     // 1️⃣ Generate RAW API key (return this once)
     const rawKey =
-      "img_ery_" + crypto.randomBytes(12).toString("hex"); // ~32 chars
+      "img_live_" + crypto.randomBytes(12).toString("hex"); // ~32 chars
 
     // 2️⃣ Hash the key before storing
     const keyHash = crypto
