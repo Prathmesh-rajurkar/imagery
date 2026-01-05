@@ -1,77 +1,91 @@
 import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
-// import { dbConnect } from "./db";
 import bcrypt from "bcryptjs";
 import { supabase } from "@/utils/supabase";
 
 export const authOptions: NextAuthOptions = {
   providers: [
     CredentialsProvider({
-      name: "credentials",
+      name: "Credentials",
       credentials: {
-        email_or_username: { label: "Email or Username", type: "text" },
-        password: { label: "Password", type: "password" },
+        email_or_username: {
+          label: "Email or Username",
+          type: "text",
+        },
+        password: {
+          label: "Password",
+          type: "password",
+        },
       },
+
       async authorize(credentials) {
-        if (!credentials?.email_or_username || credentials?.password) {
-          throw new Error("Missing Email or Password");
+        if (
+          !credentials?.email_or_username ||
+          !credentials?.password
+        ) {
+          throw new Error("Missing email/username or password");
         }
 
-        try {
-          //   await dbConnect();
-          //   const user = await User.findOne({ email: credentials.email });
-          const user = await supabase
-            .from("users")
-            .select("*")
-            .eq("email", credentials.email_or_username)
-            .or(`username.eq.${credentials.email_or_username}`)
-            .single()
-            .then((res) => res.data);
+        const value = credentials.email_or_username;
 
-          if (!user) {
-            throw new Error("No User Found");
-          }
+        // 🔍 Fetch user by email OR username
+        const { data: user, error } = await supabase
+          .from("users")
+          .select("*")
+          .or(`email.eq.${value},username.eq.${value}`)
+          .single();
 
-          const isValid = await bcrypt.compare(
-            credentials.password,
-            user.password
-          );
-          if (!isValid) {
-            throw new Error("Invalid Password");
-          }
-
-          return {
-            id: user._id.toString(),
-            email: user.email,
-          };
-        } catch (error) {
-          throw error;
+        if (error || !user) {
+          throw new Error("User not found");
         }
+
+        // 🔐 Compare hashed password
+        const isValid = await bcrypt.compare(
+          credentials.password,
+          user.password_hash
+        );
+
+        if (!isValid) {
+          throw new Error("Invalid password");
+        }
+
+        // ✅ Return minimal safe user object
+        return {
+          id: user.id, // uuid
+          email: user.email,
+          username: user.username,
+        };
       },
     }),
-    
   ],
+
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
+        token.username = user.username;
       }
       return token;
     },
+
     async session({ session, token }) {
       if (session.user) {
         session.user.id = token.id as string;
+        session.user.username = token.username as string;
       }
       return session;
     },
   },
+
   pages: {
-    signIn: "login/",
-    error: "login/",
+    signIn: "/login",
+    error: "/login",
   },
+
   session: {
     strategy: "jwt",
     maxAge: 30 * 24 * 60 * 60,
   },
+
   secret: process.env.NEXTAUTH_SECRET,
 };

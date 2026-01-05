@@ -1,43 +1,68 @@
+// app/api/auth/register/route.ts
 import { supabase } from "@/utils/supabase";
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import bcrypt from "bcryptjs";
 
 export async function POST(req: NextRequest) {
   try {
     const { email, password, username } = await req.json();
 
     if (!email || !password || !username) {
-      return new Response("Missing fields", { status: 400 });
+      return NextResponse.json(
+        { message: "Missing fields" },
+        { status: 400 }
+      );
     }
 
-    const user = await supabase
+    // 🔍 Check email
+    const { data: emailExists } = await supabase
       .from("users")
-      .select("*")
+      .select("id")
       .eq("email", email)
+      .single();
+
+    if (emailExists) {
+      return NextResponse.json(
+        { message: "Email already exists" },
+        { status: 400 }
+      );
+    }
+
+    // 🔍 Check username
+    const { data: usernameExists } = await supabase
+      .from("users")
+      .select("id")
       .eq("username", username)
-      .single()
-      .then((res) => res.data);
+      .single();
 
-    if (user) {
-      return new Response("User already exists", { status: 400 });
+    if (usernameExists) {
+      return NextResponse.json(
+        { message: "Username already exists" },
+        { status: 400 }
+      );
     }
 
-    const { data, error } = await supabase.from("users").insert([
-      {
-        email,
-        password,
-        username,
-      },
-    ]);
+    // 🔐 Hash password
+    const password_hash = await bcrypt.hash(password, 10);
 
-    if (error) {
-      throw error;
-    }
+    // ✅ Insert user
+    const { error } = await supabase.from("users").insert({
+      email,
+      username,
+      password_hash,
+    });
 
-    return new Response("User registered", { status: 201 });
+    if (error) throw error;
+
+    return NextResponse.json(
+      { message: "User registered successfully" },
+      { status: 201 }
+    );
   } catch (error) {
-
     console.error("Registration error:", error);
-    return new Response("Internal Server Error", { status: 500 });
-    
+    return NextResponse.json(
+      { message: "Internal Server Error" },
+      { status: 500 }
+    );
   }
 }
